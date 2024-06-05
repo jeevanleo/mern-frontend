@@ -4,20 +4,21 @@ import io from "socket.io-client";
 import "./style.css";
 
 class Board extends React.Component {
-  timeout;
-  socketUrl =
-    process.env.NODE_ENV === "production"
-      ? "https://mern-backend-aanb.onrender.com"
-      : "http://localhost:5000";
-  socket = io.connect(this.socketUrl);
-
-  ctx;
-  isDrawing = false;
-
   constructor(props) {
     super(props);
 
-    this.socket.on("canvas-data", function (data) {
+    const socketUrl =
+      process.env.NODE_ENV === "production"
+        ? "https://mern-backend-aanb.onrender.com"
+        : "http://localhost:5000";
+
+    this.socket = io.connect(socketUrl);
+
+    this.isDrawing = false;
+    this.drawOnCanvas = this.drawOnCanvas.bind(this);
+    this.clearCanvas = this.clearCanvas.bind(this);
+
+    this.socket.on("canvas-data", (data) => {
       var root = this;
       var interval = setInterval(function () {
         if (root.isDrawing) return;
@@ -34,23 +35,24 @@ class Board extends React.Component {
       }, 200);
     });
 
-    // Listen for the clear-canvas event
-    this.socket.on("clear-canvas", function () {
+    this.socket.on("clear-canvas", () => {
       var canvas = document.querySelector("#board");
       var ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     });
-
-    this.clearCanvas = this.clearCanvas.bind(this);
   }
 
   componentDidMount() {
     this.drawOnCanvas();
   }
 
-  componentWillReceiveProps(newProps) {
-    this.ctx.strokeStyle = newProps.color;
-    this.ctx.lineWidth = newProps.size;
+  componentDidUpdate(prevProps) {
+    if (prevProps.color !== this.props.color) {
+      this.ctx.strokeStyle = this.props.color;
+    }
+    if (prevProps.size !== this.props.size) {
+      this.ctx.lineWidth = this.props.size;
+    }
   }
 
   drawOnCanvas() {
@@ -88,8 +90,8 @@ class Board extends React.Component {
 
     canvas.addEventListener(
       "mousedown",
-      function (e) {
-        root.isDrawing = true;
+      (e) => {
+        this.isDrawing = true;
         canvas.addEventListener("mousemove", onPaint, false);
       },
       false
@@ -97,15 +99,14 @@ class Board extends React.Component {
 
     canvas.addEventListener(
       "mouseup",
-      function () {
-        root.isDrawing = false;
+      () => {
+        this.isDrawing = false;
         canvas.removeEventListener("mousemove", onPaint, false);
       },
       false
     );
 
-    var root = this;
-    var onPaint = function () {
+    var onPaint = () => {
       ctx.beginPath();
       ctx.moveTo(last_mouse.x, last_mouse.y);
       ctx.lineTo(mouse.x, mouse.y);
@@ -113,7 +114,7 @@ class Board extends React.Component {
       ctx.stroke();
 
       var base64ImageData = canvas.toDataURL("image/png");
-      root.socket.emit("canvas-data", base64ImageData);
+      this.socket.emit("canvas-data", base64ImageData);
     };
   }
 
